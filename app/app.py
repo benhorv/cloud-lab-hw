@@ -8,7 +8,7 @@ def health():
 
 @app.route("/")
 def index():
-    return "OCR App - Under Construction"
+    return "Hello Cloud Lab OCR App!"
 
 if __name__ == '__main__':
     app.run(host="0.0.0.0", port=5000)
