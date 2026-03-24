@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ocr-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ocr-app
+  template:
+    metadata:
+      labels:
+        app: ocr-app
+    spec:
+      containers:
+        - name: ocr-app
+          image: benhorv/ocr-app:{{ .Values.env.APP_VERSION }}
+          ports:
+            - name: http
+              containerPort: 5000
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 5
+            periodSeconds: 10
