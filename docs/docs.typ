@@ -50,6 +50,9 @@
 
 A házi feladat célja egy OCR (optikai karakterfelismerés) alapú webszolgáltatás megvalósítása felhős ökoszisztémában. Jelen dokumentáció első verziója a kialakított CI/CD környezetet ismerteti.
 
+- *GitHub repository:* #link("https://github.com/benhorv/cloud-lab-hw")
+- *Alkalmazás:* #link("https://ocr.bedelab.hu")
+
 = CI/CD környezet
 
 == Architektúra áttekintés
@@ -412,7 +415,7 @@ A worker egy Kafka consumer, amely folyamatosan figyeli az `ocr-jobs` topicot. M
 
 == Kafka
 
-A Kafka a `default` névtérben fut egy egyszerű Deployment-ként, a laboron megismert `bashj79/kafka-kraft` image alapján. A `KAFKA_ADVERTISED_LISTENERS` környezeti változóval a K8s service hostname-re van konfigurálva, hogy más névterekből is elérhető legyen.
+A Kafka a `default` névtérben fut egy egyszerű deploymentként a laboron megismert `bashj79/kafka-kraft` image alapján. A `KAFKA_ADVERTISED_LISTENERS` környezeti változóval a K8s service hostname-re van konfigurálva, hogy más névterekből is elérhető legyen.
 
 #figure(
   ```yaml
