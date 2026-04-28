@@ -1,10 +1,16 @@
 import os, uuid, json, io
 from flask import Flask, request, redirect, send_file, render_template
 from PIL import Image, ImageDraw
-import pytesseract
+from kafka import KafkaProducer
 
 app = Flask(__name__)
 DATA_DIR = "/data"
+KAFKA_TOPIC = "ocr-jobs"
+
+producer = KafkaProducer(
+    bootstrap_servers=os.environ.get("KAFKA_BROKER", "kafka:9092"),
+    value_serializer=lambda v: json.dumps(v).encode()
+)
 
 def load_entries():
     if not os.path.exists(DATA_DIR):
@@ -34,16 +40,12 @@ def upload():
     img_path = os.path.join(entry_dir, f"image{ext}")
     img_file.save(img_path)
 
-    img = Image.open(img_path)
-    data = pytesseract.image_to_data(img, output_type=pytesseract.Output.DICT)
-    words = [
-        {"text": w, "x": data["left"][i], "y": data["top"][i],
-         "w": data["width"][i], "h": data["height"][i]}
-        for i, w in enumerate(data["text"]) if w.strip()
-    ]
     with open(os.path.join(entry_dir, "meta.json"), "w") as f:
-        json.dump({"description": description, "words": words,
-                   "text": " ".join(w["text"] for w in words), "ext": ext}, f)
+        json.dump({"description": description, "ext": ext,
+                   "status": "pending", "text": "", "words": []}, f)
+
+    producer.send(KAFKA_TOPIC, {"id": eid})
+    producer.flush()
     return redirect("/")
 
 @app.route("/image/<eid>")
@@ -53,7 +55,7 @@ def serve_image(eid):
         meta = json.load(f)
     img = Image.open(os.path.join(entry_dir, f"image{meta['ext']}")).convert("RGB")
     draw = ImageDraw.Draw(img)
-    for w in meta["words"]:
+    for w in meta.get("words", []):
         draw.rectangle([w["x"], w["y"], w["x"]+w["w"], w["y"]+w["h"]], outline="red", width=2)
     buf = io.BytesIO()
     img.save(buf, format="JPEG")

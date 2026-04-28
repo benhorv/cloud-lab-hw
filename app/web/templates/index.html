@@ -11,9 +11,15 @@
   <hr>
   {% for e in entries %}
   <div>
-    <p><strong>{{ e.description }}</strong></p>
+    <p><strong>{{ e.description }}</strong>
+    {% if e.status == "pending" %}
+      <em>(feldolgozás alatt...)</em>
+    {% endif %}
+    </p>
     <a href="/image/{{ e.id }}"><img src="/image/{{ e.id }}" height="200"></a>
+    {% if e.text %}
     <p>Detected: {{ e.text }}</p>
+    {% endif %}
   </div>
   <hr>
   {% endfor %}
