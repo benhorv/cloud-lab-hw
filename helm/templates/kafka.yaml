@@ -18,6 +18,9 @@ spec:
           image: bashj79/kafka-kraft
           ports:
             - containerPort: 9092
+          env:
+            - name: KAFKA_ADVERTISED_LISTENERS
+              value: "PLAINTEXT://kafka.default.svc.cluster.local:9092"
 ---
 apiVersion: v1
 kind: Service
