@@ -10,4 +10,4 @@ spec:
       protocol: TCP
       name: http
   selector:
-    app: ocr-app
+    app: ocr-web
