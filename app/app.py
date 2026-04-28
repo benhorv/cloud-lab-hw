@@ -1,28 +1,10 @@
 import os, uuid, json, io
-from flask import Flask, request, redirect, send_file, render_template_string
+from flask import Flask, request, redirect, send_file, render_template
 from PIL import Image, ImageDraw
 import pytesseract
 
 app = Flask(__name__)
 DATA_DIR = "/data"
-
-TEMPLATE = """<!DOCTYPE html>
-<html><head><title>OCR App</title></head><body>
-<h1>OCR App</h1>
-<form method="post" action="/upload" enctype="multipart/form-data">
-  <input type="file" name="image" accept="image/*" required>
-  <input type="text" name="description" placeholder="Description" required>
-  <button type="submit">Upload</button>
-</form>
-<hr>
-{% for e in entries %}
-<div>
-  <p><strong>{{ e.description }}</strong></p>
-  <a href="/image/{{ e.id }}"><img src="/image/{{ e.id }}" height="200"></a>
-  <p>Detected: {{ e.text }}</p>
-</div><hr>
-{% endfor %}
-</body></html>"""
 
 def load_entries():
     if not os.path.exists(DATA_DIR):
@@ -39,7 +21,7 @@ def load_entries():
 
 @app.route("/")
 def index():
-    return render_template_string(TEMPLATE, entries=load_entries())
+    return render_template("index.html", entries=load_entries())
 
 @app.route("/upload", methods=["POST"])
 def upload():

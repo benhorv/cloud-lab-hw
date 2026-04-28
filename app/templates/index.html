@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+<head><title>OCR App</title></head>
+<body>
+  <h1>OCR App</h1>
+  <form method="post" action="/upload" enctype="multipart/form-data">
+    <input type="file" name="image" accept="image/*" required>
+    <input type="text" name="description" placeholder="Description" required>
+    <button type="submit">Upload</button>
+  </form>
+  <hr>
+  {% for e in entries %}
+  <div>
+    <p><strong>{{ e.description }}</strong></p>
+    <a href="/image/{{ e.id }}"><img src="/image/{{ e.id }}" height="200"></a>
+    <p>Detected: {{ e.text }}</p>
+  </div>
+  <hr>
+  {% endfor %}
+</body>
+</html>

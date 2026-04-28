@@ -3,4 +3,5 @@ RUN apt-get update && apt-get install -y tesseract-ocr && rm -rf /var/lib/apt/li
 RUN pip install flask pytesseract pillow
 WORKDIR /app
 COPY app.py .
+COPY templates/ templates/
 CMD ["python", "-u", "app.py"]
