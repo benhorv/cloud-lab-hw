@@ -20,7 +20,7 @@ spec:
               containerPort: 5000
           env:
             - name: KAFKA_BROKER
-              value: "kafka:9092"
+              value: "kafka.default.svc.cluster.local:9092"
           volumeMounts:
             - name: data
               mountPath: /data
@@ -60,7 +60,7 @@ spec:
           image: benhorv/ocr-worker:{{ .Values.env.WORKER_VERSION }}
           env:
             - name: KAFKA_BROKER
-              value: "kafka:9092"
+              value: "kafka.default.svc.cluster.local:9092"
           volumeMounts:
             - name: data
               mountPath: /data

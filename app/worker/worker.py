@@ -26,13 +26,21 @@ def process(eid):
         json.dump(meta, f)
     print(f"Processed {eid}: {len(words)} words", flush=True)
 
-consumer = KafkaConsumer(
-    "ocr-jobs",
-    bootstrap_servers=KAFKA_BROKER,
-    value_deserializer=lambda v: json.loads(v.decode()),
-    auto_offset_reset="earliest",
-    group_id="ocr-worker"
-)
+import time
+
+while True:
+    try:
+        consumer = KafkaConsumer(
+            "ocr-jobs",
+            bootstrap_servers=KAFKA_BROKER,
+            value_deserializer=lambda v: json.loads(v.decode()),
+            auto_offset_reset="earliest",
+            group_id="ocr-worker"
+        )
+        break
+    except Exception as e:
+        print(f"Waiting for Kafka: {e}", flush=True)
+        time.sleep(5)
 
 print("OCR worker ready, waiting for jobs...", flush=True)
 for msg in consumer:
