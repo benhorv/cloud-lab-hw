@@ -7,7 +7,6 @@ on:
 env:
   DOCKERHUB_USERNAME: ${{ secrets.DOCKER_USERNAME }}
   DOCKERHUB_KEY: ${{ secrets.DOCKER_KEY }}
-  IMAGE_NAME: ocr-app
 
 jobs:
   build-and-deploy:
@@ -21,18 +20,23 @@ jobs:
           username: ${{ env.DOCKERHUB_USERNAME }}
           password: ${{ env.DOCKERHUB_KEY }}
 
-      - name: Build Docker image
-        run: cd app && docker build -t ${{ env.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ github.sha }} .
+      - name: Build and push web image
+        run: |
+          docker build -t ${{ env.DOCKERHUB_USERNAME }}/ocr-web:${{ github.sha }} app/web
+          docker push ${{ env.DOCKERHUB_USERNAME }}/ocr-web:${{ github.sha }}
 
-      - name: Push Docker image
-        run: docker push ${{ env.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+      - name: Build and push worker image
+        run: |
+          docker build -t ${{ env.DOCKERHUB_USERNAME }}/ocr-worker:${{ github.sha }} app/worker
+          docker push ${{ env.DOCKERHUB_USERNAME }}/ocr-worker:${{ github.sha }}
 
       - name: Update Helm values.yaml
         run: |
           cd helm
-          sed -i 's|APP_VERSION:.*|APP_VERSION: '${{ github.sha }}'|' values.yaml
+          sed -i 's|WEB_VERSION:.*|WEB_VERSION: '${{ github.sha }}'|' values.yaml
+          sed -i 's|WORKER_VERSION:.*|WORKER_VERSION: '${{ github.sha }}'|' values.yaml
           git config --global user.name 'GitHub Actions'
           git config --global user.email 'actions@github.com'
           git add values.yaml
-          git commit -m "Update image tag to ${{ github.sha }}"
+          git commit -m "Update image tags to ${{ github.sha }}"
           git push
