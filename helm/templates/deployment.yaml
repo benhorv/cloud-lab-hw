@@ -18,6 +18,9 @@ spec:
           ports:
             - name: http
               containerPort: 5000
+          volumeMounts:
+            - name: data
+              mountPath: /data
           readinessProbe:
             httpGet:
               path: /health
@@ -30,3 +33,7 @@ spec:
               port: 5000
             initialDelaySeconds: 5
             periodSeconds: 10
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: ocr-data
