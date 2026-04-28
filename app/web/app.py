@@ -16,7 +16,7 @@ def get_producer():
         _producer = KafkaProducer(
             bootstrap_servers=KAFKA_BROKER,
             value_serializer=lambda v: json.dumps(v).encode(),
-            api_version=(3, 9, 0)
+            api_version=(3, 0, 0)
         )
     return _producer
 

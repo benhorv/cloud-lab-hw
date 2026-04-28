@@ -36,7 +36,7 @@ while True:
             value_deserializer=lambda v: json.loads(v.decode()),
             auto_offset_reset="earliest",
             group_id="ocr-worker",
-            api_version=(3, 9, 0)
+            api_version=(3, 0, 0)
         )
         break
     except Exception as e:
