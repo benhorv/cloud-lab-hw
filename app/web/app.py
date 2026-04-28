@@ -7,10 +7,17 @@ app = Flask(__name__)
 DATA_DIR = "/data"
 KAFKA_TOPIC = "ocr-jobs"
 
-producer = KafkaProducer(
-    bootstrap_servers=os.environ.get("KAFKA_BROKER", "kafka:9092"),
-    value_serializer=lambda v: json.dumps(v).encode()
-)
+KAFKA_BROKER = os.environ.get("KAFKA_BROKER", "kafka:9092")
+_producer = None
+
+def get_producer():
+    global _producer
+    if _producer is None:
+        _producer = KafkaProducer(
+            bootstrap_servers=KAFKA_BROKER,
+            value_serializer=lambda v: json.dumps(v).encode()
+        )
+    return _producer
 
 def load_entries():
     if not os.path.exists(DATA_DIR):
@@ -44,8 +51,8 @@ def upload():
         json.dump({"description": description, "ext": ext,
                    "status": "pending", "text": "", "words": []}, f)
 
-    producer.send(KAFKA_TOPIC, {"id": eid})
-    producer.flush()
+    get_producer().send(KAFKA_TOPIC, {"id": eid})
+    get_producer().flush()
     return redirect("/")
 
 @app.route("/image/<eid>")
