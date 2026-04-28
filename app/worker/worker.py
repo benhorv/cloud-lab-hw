@@ -35,7 +35,8 @@ while True:
             bootstrap_servers=KAFKA_BROKER,
             value_deserializer=lambda v: json.loads(v.decode()),
             auto_offset_reset="earliest",
-            group_id="ocr-worker"
+            group_id="ocr-worker",
+            api_version=(3, 9, 0)
         )
         break
     except Exception as e:
