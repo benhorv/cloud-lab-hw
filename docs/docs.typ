@@ -294,3 +294,184 @@ Nem a házi feladat szerves része, de a környezetből adódóan kihasználom, 
 Az alkalmazás a K3s klaszterben fut, NodePort-on érhető el lokálisan, és Cloudflare Tunnel-en keresztül publikusan a `https://ocr.bedelab.hu` címen.
 
 #figure(image("assets/image-11.png", width: 80%), caption: [Az alkalmazás a böngészőben])
+
+= Weboldal és OCR detektálás
+
+== Architektúra
+
+A második részfeladatban a placeholder Flask alkalmazást egy valódi OCR webszolgáltatással váltottam fel. A rendszer két külön konténerből áll, amelyek egy Kafka üzenetsoron keresztül kommunikálnak egymással. Ez a megközelítés megfelel a felhős mikroszolgáltatás-elveknek, a webapp és az OCR egymástól függetlenül skálázható és futtatható.
+
+Így néz ki egy szekvencia:
+
++ A user feltölti a képet
++ A `web` konténer elmenti a képet a megosztott PVC-re (`/data/<uuid>/`), majd üzenetet küld a Kafka `ocr-jobs` topicba
++ A `worker` konténer megkapja az üzenetet, lefuttatja az OCR-t, és az eredményt beírja a `meta.json` fájlba
++ A user a képre kattintva láthatja az annotált verziót, amin a detektált szavak jelölve vannak
+
+== Stack
+
+#table(
+  columns: (auto, 1fr),
+  stroke: 0.5pt,
+  inset: 8pt,
+  [OCR], [Tesseract (pytesseract)],
+  [Képfeldolgozás], [Pillow],
+  [Üzenetsor], [Kafka],
+  [Tárolás], [Kubernetes PVC (K3s lokális tárhely)],
+  [Webszerver], [Flask],
+)
+
+A Tesseract mellett döntöttem, mivel konténerben futtatható, nem igényel külső API-t. A Kafka a laboron megismert megoldás, ezért választottam. Lehet kicsit előre dolgoztam a Kafkával, de a 3. feladatrészhez jól jön, hogy már megvan.
+
+== Projektstruktúra
+
+Az `app` mappa két alkönyvtárra bővült:
+
+#figure(
+  ```
+  app/
+    web/          # Flask webalkalmazás
+      app.py
+      Dockerfile
+      templates/
+        index.html
+    worker/       # OCR feldolgozó
+      worker.py
+      Dockerfile
+  ```,
+  caption: [Frissített projekt struktúra],
+)
+
+== Adatszerkezet
+
+Minden feltöltött kép egy saját könyvtárban tárolódik a PVC-n:
+
+#figure(
+  ```
+  /data/
+    <uuid>/
+      image<ext>    // az eredeti feltöltött kép
+      meta.json     // leírás + OCR eredmények
+  ```,
+  caption: [Tárolási struktúra a PVC-n],
+)
+
+A `meta.json` felépítése:
+
+#figure(
+  ```json
+  {
+    "description": "Példa leírás",
+    "text": "Detektált szöveg egy sorban",
+    "ext": ".png",
+    "status": "done",
+    "words": [
+      {"text": "Szó", "x": 10, "y": 20, "w": 50, "h": 15}
+    ]
+  }
+  ```,
+  caption: [meta.json adatszerkezet],
+)
+
+== Web konténer (app/web)
+
+A Flask alkalmazás három végpontot valósít meg:
+
+- `GET /`: korábbi feltöltések listája leírással és detektált szöveggel
+- `POST /upload`: kép mentése a PVC-re, üzenet küldése a Kafka `ocr-jobs` topicba, átirányítás
+- `GET /image/<id>`: annotált kép megjelenítése/kiszolgálása, ezzel dolgozik a Pillow is
+
+#figure(
+  ```dockerfile
+  FROM python:3.12-slim
+  RUN pip install flask pillow kafka-python
+  WORKDIR /app
+  COPY app.py .
+  COPY templates/ templates/
+  CMD ["python", "-u", "app.py"]
+  ```,
+  caption: [Web Dockerfile (app/web/Dockerfile)],
+)
+
+== Worker konténer (app/worker)
+
+A worker egy Kafka consumer, amely folyamatosan figyeli az `ocr-jobs` topicot. Minden üzenet érkezésekor beolvassa a képet a PVC-ről, lefuttatja a Tesseract OCR-t, majd visszaírja az eredményt a `meta.json` fájlba.
+
+#figure(
+  ```dockerfile
+  FROM python:3.12-slim
+  RUN apt-get update && apt-get install -y tesseract-ocr \
+      && rm -rf /var/lib/apt/lists/*
+  RUN pip install pytesseract pillow kafka-python
+  WORKDIR /app
+  COPY worker.py .
+  CMD ["python", "-u", "worker.py"]
+  ```,
+  caption: [Worker Dockerfile (app/worker/Dockerfile)],
+)
+
+== Kafka
+
+A Kafka a `default` névtérben fut egy egyszerű Deployment-ként, a laboron megismert `bashj79/kafka-kraft` image alapján. A `KAFKA_ADVERTISED_LISTENERS` környezeti változóval a K8s service hostname-re van konfigurálva, hogy más névterekből is elérhető legyen.
+
+#figure(
+  ```yaml
+  env:
+    - name: KAFKA_ADVERTISED_LISTENERS
+      value: "PLAINTEXT://kafka.default.svc.cluster.local:9092"
+  ```,
+  caption: [Kafka advertised listener beállítása],
+)
+
+== Helm templates
+
+A `deployment.yaml` két deploymentet definiál (`ocr-web` és `ocr-worker`), mindkettő ugyanazt a PVC-t mountolja `/data` alá. A `values.yaml` külön verziótageket tárol a két image-hez, amelyeket a CI pipeline frissít.
+
+#figure(
+  ```yaml
+  apiVersion: v1
+  kind: PersistentVolumeClaim
+  metadata:
+    name: ocr-data
+  spec:
+    accessModes:
+      - ReadWriteOnce
+    resources:
+      requests:
+        storage: 1Gi
+  ```,
+  caption: [PersistentVolumeClaim (helm/templates/pvc.yaml)],
+)
+
+== GitHub Actions CI pipeline
+
+A CI pipeline kiegészült a két image buildelésével és pusholásával, valamint a `values.yaml` mindkét verziótagjének frissítésével.
+
+#figure(
+  ```yaml
+  - name: Build and push web image
+    run: |
+      docker build -t ${{ env.DOCKERHUB_USERNAME }}/ocr-web:${{ github.sha }} app/web
+      docker push ${{ env.DOCKERHUB_USERNAME }}/ocr-web:${{ github.sha }}
+
+  - name: Build and push worker image
+    run: |
+      docker build -t ${{ env.DOCKERHUB_USERNAME }}/ocr-worker:${{ github.sha }} app/worker
+      docker push ${{ env.DOCKERHUB_USERNAME }}/ocr-worker:${{ github.sha }}
+  ```,
+  caption: [Frissített CI pipeline (cd.yml)],
+)
+
+#figure(image("assets/image-12.png", width: 80%), caption: [GitHub Actions-ben web és worker image buildelése])
+
+#figure(image("assets/image-13.png", width: 80%), caption: [Docker Hub ocr-web és ocr-worker image-ek])
+
+== Működés ellenőrzése
+
+Az alkalmazás podjai a `kubectl get pods -n ocr-app` paranccsal ellenőrizhetők.
+
+#figure(image("assets/image-14.png", width: 80%), caption: [Futó podok állapota])
+
+#figure(image("assets/image-15.png", width: 80%), caption: [A weboldal feltöltési formmal és OCR eredménnyel])
+
+#figure(image("assets/image-16.png", width: 80%), caption: [Annotált kép a detektált szövegekkel])
